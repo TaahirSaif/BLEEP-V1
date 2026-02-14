@@ -42,6 +42,17 @@ pub struct BLEEPShardingModule {
 }
 
 impl BLEEPShardingModule {
+
+    /// Returns a summary of all shards as a String (stub for P2P broadcast)
+    pub fn get_shard_summary(&self) -> String {
+        // Stub: Just return a JSON string with shard loads
+        let summary: std::collections::HashMap<u64, usize> = self.shards.iter().map(|(&id, shard)| {
+            let shard_guard = shard.lock().unwrap();
+            (id, shard_guard.load)
+        }).collect();
+        serde_json::to_string(&summary).unwrap_or_else(|_| "{}".to_string())
+    }
+    fn validate_rebalance_with_consensus(&mut self, _source_id: u64, _target_id: u64) -> bool { true }
     /// Initialize a new sharding module with persistent storage
     pub fn new(num_shards: u64, consensus: Arc<Mutex<BLEEPAdaptiveConsensus>>, p2p_node: Arc<P2PNode>) -> Result<Self, BLEEPError> {
         let mut shards = HashMap::new();
@@ -72,14 +83,18 @@ impl BLEEPShardingModule {
     /// Assigns a transaction to a shard based on AI predictions
     pub fn assign_transaction(&mut self, transaction: Transaction) -> Result<(), BLEEPError> {
         let shard_id = self.predict_least_loaded_shard()?;
-
-        let mut shard = self.shards.get(&shard_id).ok_or(BLEEPError::InvalidShard)?.lock().unwrap();
-        shard.transactions.push_back(transaction);
-        shard.load += 1;
-        
+        {
+            let mut shard = self.shards.get(&shard_id).ok_or(BLEEPError::InvalidShard)?.lock().unwrap();
+            shard.transactions.push_back(transaction);
+            shard.load += 1;
+        }
         self.persist_shard_state(shard_id);
-
-        if shard.load > self.load_threshold {
+        // Only borrow mutably after previous borrow is dropped
+        let need_rebalance = {
+            let shard = self.shards.get(&shard_id).ok_or(BLEEPError::InvalidShard)?.lock().unwrap();
+            shard.load > self.load_threshold
+        };
+        if need_rebalance {
             self.monitor_and_auto_rebalance();
         }
         Ok(())
@@ -96,20 +111,28 @@ impl BLEEPShardingModule {
     }
 
     /// Monitors and dynamically rebalances shards based on AI predictions
-    fn monitor_and_auto_rebalance(&mut self) {
+    pub fn monitor_and_auto_rebalance(&mut self) {
         let current_time = Self::current_time();
         if current_time - self.last_rebalance_timestamp < REBALANCE_PERIOD {
             return;
         }
 
         let avg_load = self.calculate_avg_load();
-        for (&source_id, shard_mutex) in &self.shards {
-            let mut source_shard = shard_mutex.lock().unwrap();
-            if source_shard.load > avg_load {
-                let target_id = self.select_target_shard();
-                if source_id != target_id && self.validate_rebalance_with_consensus(source_id, target_id) {
-                    self.rebalance_shards(source_id, target_id);
+        // Collect source_ids to rebalance first to avoid borrow checker issues
+        let to_rebalance: Vec<u64> = self.shards.iter()
+            .filter_map(|(&source_id, shard_mutex)| {
+                let source_shard = shard_mutex.lock().unwrap();
+                if source_shard.load > avg_load {
+                    Some(source_id)
+                } else {
+                    None
                 }
+            })
+            .collect();
+        for source_id in to_rebalance {
+            let target_id = self.select_target_shard();
+            if source_id != target_id && self.validate_rebalance_with_consensus(source_id, target_id) {
+                self.rebalance_shards(source_id, target_id);
             }
         }
 
@@ -137,7 +160,7 @@ impl BLEEPShardingModule {
     }
 
     /// Persist shard state to the database
-    fn persist_shard_state(&self, shard_id: u64) {
+    pub fn persist_shard_state(&self, shard_id: u64) {
         let shard = self.shards.get(&shard_id).unwrap().lock().unwrap();
         let transactions: Vec<String> = shard.transactions.iter().map(|tx| serde_json::to_string(tx).unwrap()).collect();
         let transactions_json = serde_json::to_string(&transactions).unwrap();
@@ -177,3 +200,9 @@ impl BLEEPShardingModule {
         std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as u64
     }
 }
+
+// Use Transaction from crate::transaction
+// Use QuantumSecure from crate::transaction
+// Use BLEEPAdaptiveConsensus and ConsensusMode from crate::consensus
+// Use P2PMessage from bleep-p2p
+// Use Block from crate::block

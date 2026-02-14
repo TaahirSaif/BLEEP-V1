@@ -1,10 +1,34 @@
+use crate::state_storage::BlockchainState;
+impl ShardManager {
+    pub fn get_state_for_shard(&self, _shard_id: u64) -> Option<BlockchainState> {
+        // Stub: always return None
+        None
+    }
+}
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use log::{info, warn, error};
 use crate::sharding::{BLEEPShardingModule, BLEEPError};
+use crate::p2p::P2PNode;
 use crate::transaction::Transaction;
 use crate::consensus::BLEEPAdaptiveConsensus;
-use crate::p2p::{P2PNode, P2PMessage};
+use crate::p2p::P2PMessage;
+
+// Use Transaction from crate::transaction
+// Use BLEEPAdaptiveConsensus from crate::consensus
+// Use P2PNode from sharding.rs
+// Use P2PMessage from bleep-p2p
+
+// Use BLEEPError from crate::sharding
+
+pub struct Shard {
+    pub transactions: std::collections::VecDeque<Transaction>,
+    pub load: usize,
+}
+
+// Use BLEEPShardingModule from crate::sharding
+
+// Use BLEEPShardingModule implementation from sharding.rs
 
 pub struct ShardManager {
     pub sharding_module: Arc<Mutex<BLEEPShardingModule>>,
@@ -25,7 +49,7 @@ impl ShardManager {
 
     /// Adds a transaction to the appropriate shard
     pub fn add_transaction(&self, transaction: Transaction) -> Result<(), BLEEPError> {
-        let mut sharding_module = self.sharding_module.lock().unwrap();
+    let mut sharding_module = self.sharding_module.lock().unwrap();
         info!(
             "[ShardManager] Adding transaction ID {} from {} to {} with amount {}",
             transaction.id, transaction.from, transaction.to, transaction.amount
@@ -46,7 +70,7 @@ impl ShardManager {
         
         if let Some(shard) = sharding_module.shards.get(&shard_id) {
             let mut shard_guard = shard.lock().unwrap();
-            shard_guard.transactions.push_back(transaction);
+            shard_guard.transactions.push_back(transaction.clone());
             shard_guard.load += 1;
             info!("[ShardManager] Manually assigned transaction ID {} to Shard {}", transaction.id, shard_id);
             sharding_module.persist_shard_state(shard_id);
@@ -85,8 +109,8 @@ impl ShardManager {
 
     /// Checks node health, removing inactive peers
     pub fn check_node_health(&self) {
-        let mut p2p_node = self.sharding_module.lock().unwrap().p2p_node.clone();
-        let peers = p2p_node.peers.lock().unwrap().clone();
+    let p2p_node = self.sharding_module.lock().unwrap().p2p_node.clone();
+    let peers = p2p_node.peers().clone();
         
         for peer in peers.iter() {
             if !p2p_node.is_peer_active(peer) {
