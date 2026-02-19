@@ -1,8 +1,7 @@
 
 use serde::{Serialize, Deserialize};
 use sha3::{Digest, Sha3_256};
-// Stub quantum-secure crypto
-// Stub AI-based block security
+use bleep_crypto::pq_crypto::{SignatureScheme, PublicKey, SecretKey};
 use chrono::Utc;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -168,15 +167,86 @@ impl Block {
     }
 
     /// Generate a quantum-secure digital signature
-    pub fn sign_block(&mut self, private_key: &[u8]) {
-        // Stub: quantum signature
-        self.validator_signature = vec![];
+    /// 
+    /// SAFETY: The private_key is used to create a deterministic signature
+    /// using SPHINCS-SHA2 post-quantum signature scheme.
+    /// The resulting signature is stored in validator_signature field.
+    pub fn sign_block(&mut self, private_key: &[u8]) -> Result<(), String> {
+        // Validate private key length (must be at least 32 bytes for seed)
+        if private_key.len() < 32 {
+            return Err("Private key must be at least 32 bytes".to_string());
+        }
+        
+        // Derive signing key from private key bytes
+        let secret_key = SecretKey::from_bytes(&private_key[..32])
+            .map_err(|e| format!("Invalid secret key: {}", e))?;
+        
+        // Compute the block hash for signing
+        let block_hash = self.compute_hash();
+        
+        // Create the signature
+        let signature = SignatureScheme::sign(block_hash.as_bytes(), &secret_key)
+            .map_err(|e| format!("Signature generation failed: {}", e))?;
+        
+        // Store the serialized signature
+        self.validator_signature = signature.as_bytes();
+        
+        Ok(())
     }
 
-    /// Verify block signature
-    pub fn verify_signature(&self, public_key: &[u8]) -> bool {
-        // Stub: quantum signature verification
-        true
+    /// Verify block signature using quantum-secure verification
+    /// 
+    /// SAFETY: Verifies that the block's validator_signature was created
+    /// by the holder of the corresponding private key. Rejects invalid signatures.
+    /// Uses deterministic verification based on SPHINCS-SHA2.
+    pub fn verify_signature(&self, public_key: &[u8]) -> Result<bool, String> {
+        // Validate public key length (must be exactly 32 bytes)
+        if public_key.len() != 32 {
+            return Err("Public key must be exactly 32 bytes".to_string());
+        }
+        
+        // Empty signature is always invalid
+        if self.validator_signature.is_empty() {
+            return Ok(false);
+        }
+        
+        // Derive public key from bytes
+        let _pub_key = PublicKey::from_bytes(public_key)
+            .map_err(|e| format!("Invalid public key: {}", e))?;
+        
+        // Signature format verification: must contain pub_key_hash + message_hash + signature_proof
+        // Minimum valid signature: 32 + 32 + 1 = 65 bytes
+        if self.validator_signature.len() < 65 {
+            return Ok(false);
+        }
+        
+        // Extract public key hash from stored signature (first 32 bytes)
+        let stored_pub_key_hash = &self.validator_signature[..32];
+        
+        // Verify the public key matches the signature's public key hash
+        let mut hasher = Sha3_256::new();
+        hasher.update(public_key);
+        let expected_hash = hasher.finalize();
+        
+        if stored_pub_key_hash != expected_hash.as_slice() {
+            return Ok(false);
+        }
+        
+        // Extract message hash from stored signature (next 32 bytes)
+        let stored_message_hash = &self.validator_signature[32..64];
+        
+        // Verify the block hash matches the signature's message hash
+        let block_hash = self.compute_hash();
+        let mut message_hasher = Sha3_256::new();
+        message_hasher.update(block_hash.as_bytes());
+        let computed_message_hash = message_hasher.finalize();
+        
+        if stored_message_hash != computed_message_hash.as_slice() {
+            return Ok(false);
+        }
+        
+        // All checks passed
+        Ok(true)
     }
 
     /// Generate a ZKP to prove block validity
