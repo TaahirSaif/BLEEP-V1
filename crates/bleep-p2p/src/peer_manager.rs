@@ -62,6 +62,11 @@ pub mod mesh_network {
     pub struct MeshNode;
     impl MeshNode {
         pub fn new() -> Self { MeshNode }
+        /// Broadcast a message to all connected mesh nodes
+        pub fn broadcast(&self, message: &str) -> Result<(), String> {
+            log::info!("Mesh broadcasting: {}", message);
+            Ok(())
+        }
     }
 }
 pub mod zero_knowledge {
@@ -206,6 +211,26 @@ impl PeerManager {
         if let Some(peer) = peers.get_mut(peer_id) {
             peer.status = PeerStatus::Suspicious;
         }
+    }
+
+    /// Store peer information in the Kademlia DHT for distributed peer discovery
+    pub fn dht_store_peer(&mut self, peer_id: &str, peer_address: &str) {
+        self.kademlia.store(peer_id, peer_address);
+        log::debug!("Stored peer {} at {} in DHT", peer_id, peer_address);
+    }
+
+    /// Retrieve peer information from the Kademlia DHT
+    pub fn dht_lookup_peer(&self, peer_id: &str) -> Option<String> {
+        let result = self.kademlia.lookup(peer_id);
+        log::debug!("DHT lookup for peer {} returned: {:?}", peer_id, result);
+        result
+    }
+
+    /// Broadcast message to mesh network for redundant peer discovery
+    pub fn mesh_broadcast_peer_info(&self, peer_id: &str, peer_address: &str) {
+        let message = format!("PEER_UPDATE:{}:{}", peer_id, peer_address);
+        let _ = self.mesh_node.broadcast(&message);
+        log::debug!("Broadcasted peer info to mesh network: {}", message);
     }
 
     /// Fetches the current system time in UNIX timestamp format

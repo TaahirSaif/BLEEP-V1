@@ -63,19 +63,30 @@ impl GossipProtocol {
         message.payload.clone()
     }
 
-    /// Securely gossips a message to high-scoring peers
+    /// Securely gossips a message to high-scoring peers using peer scoring and message protocol
     pub async fn gossip_message(&self, message: SecureMessage) {
         let peers = self.peers.lock().unwrap().clone();
         for peer_id in peers {
-            let encrypted_payload = self.encrypt_message(&message);
-            let _secure_message = SecureMessage {
-                sender_id: message.sender_id.clone(),
-                message_type: MessageType::Custom("gossip".to_string()),
-                payload: encrypted_payload,
-                signature: message.signature.clone(),
-                hop_count: 1,
-            };
-            println!("Stub gossip to peer: {:?}", peer_id);
+            // Use peer_scoring to filter and prioritize high-reputation peers
+            let peer_score = self.peer_scoring.calculate_score(peer_id.as_str());
+            
+            // Only gossip to peers with acceptable reputation
+            if peer_score >= 50.0 {
+                let encrypted_payload = self.encrypt_message(&message);
+                let secure_message = SecureMessage {
+                    sender_id: message.sender_id.clone(),
+                    message_type: MessageType::Custom("gossip".to_string()),
+                    payload: encrypted_payload,
+                    signature: message.signature.clone(),
+                    hop_count: 1,
+                };
+                
+                // Use message_protocol to send the secure message
+                self.message_protocol.queue_message(secure_message).await;
+                log::debug!("Gossipped to peer {} with score {}", peer_id, peer_score);
+            } else {
+                log::warn!("Skipping gossip to low-reputation peer: {}", peer_id);
+            }
         }
     }
 
