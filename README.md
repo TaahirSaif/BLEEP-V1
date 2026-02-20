@@ -1,50 +1,144 @@
+<div align="center">
 
-# BLEEP
+<img src="https://www.bleepecosystem.com/logo.png" alt="BLEEP Logo" width="120" />
 
-BLEEP is a next-generation, self-amending blockchain platform designed to overcome the limitations of current blockchains. It integrates artificial intelligence, quantum readiness, and programmable assets to create a secure, modular, and future-proof ecosystem for developers and users alike.
+# BLEEP Ecosystem
+
+**Self-Healing · Quantum-Secure · AI-Native Blockchain**
+
+[![Build & Test](https://github.com/bleep-project/bleep/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/bleep-project/bleep/actions/workflows/build-and-test.yml)
+[![Security Audit](https://github.com/bleep-project/bleep/actions/workflows/security.yml/badge.svg)](https://github.com/bleep-project/bleep/actions/workflows/security.yml)
+[![Code Quality](https://github.com/bleep-project/bleep/actions/workflows/code-quality.yml/badge.svg)](https://github.com/bleep-project/bleep/actions/workflows/code-quality.yml)
+[![License: MIT OR Apache-2.0](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
+[![Rust Edition](https://img.shields.io/badge/Rust-2021%20Edition-orange.svg)](https://www.rust-lang.org)
+[![Version](https://img.shields.io/badge/version-1.0.0-green.svg)](Cargo.toml)
+
+*A next-generation blockchain operating system built for the AI era — quantum-resistant, self-governing, and environmentally sustainable.*
+
+[Website](https://www.bleepecosystem.com) · [Whitepaper](docs/BLEEP_Whitepaper.pdf) · [Documentation](#documentation) · [Roadmap](#roadmap) · [Contributing](CONTRIBUTING.md)
+
+</div>
 
 ---
 
 ## Table of Contents
 
 - [Overview](#overview)
+- [Key Features](#key-features)
 - [Architecture](#architecture)
+- [Workspace Crates](#workspace-crates)
 - [Getting Started](#getting-started)
-- [Configuration](#configuration)
-- [BLEEP Token (BLP)](#bleep-token-blp)
-- [Programmable Asset Token (PAT)](#programmable-asset-token-pat)
-- [Faucet & Wallet](#faucet--wallet)
-- [Development Roadmap](#development-roadmap)
-- [Testnet Status](#testnet-status)
-- [Support BLEEP](#support-bleep)
+  - [Prerequisites](#prerequisites)
+  - [Building from Source](#building-from-source)
+  - [Running a Node](#running-a-node)
+  - [Configuration](#configuration)
+- [Core Modules](#core-modules)
+  - [Consensus Engine](#consensus-engine)
+  - [Self-Healing Orchestrator](#self-healing-orchestrator)
+  - [Post-Quantum Cryptography](#post-quantum-cryptography)
+  - [Dynamic Sharding](#dynamic-sharding)
+  - [BLEEP VM](#bleep-vm)
+  - [Governance](#governance)
+  - [BLEEP Connect](#bleep-connect)
+  - [Tokenomics (BLP)](#tokenomics-blp)
+- [Testing](#testing)
+- [Benchmarks](#benchmarks)
+- [Roadmap](#roadmap)
+- [Security](#security)
 - [Contributing](#contributing)
-- [Community](#community)
 - [License](#license)
 
 ---
 
 ## Overview
 
-BLEEP is designed as a modular, scalable, and intelligent blockchain platform. Its features include:
+BLEEP is a post-blockchain operating system designed from first principles to meet the demands of the AI-native, post-quantum world. It replaces the static assumptions of legacy Layer 1 chains with a living, adaptive network where intelligence, computation, and economic coordination merge in a single coherent ecosystem.
 
-- **Self-Amending Core**: Enables protocol upgrades without hard forks.
-- **AI Decision Engine**: Integrated AI for smart resource allocation and governance enhancements.
-- **Quantum and ZK-Ready VM**: Ensures long-term security and privacy.
-- **WASM-Based Contracts**: Secure, efficient smart contract execution.
-- **Multi-Chain Support**: Easily integrates with other blockchain ecosystems.
-- **Super App Ecosystem**: Designed to host blockchain tools, developer resources, communication layers, and more.
+BLEEP is written entirely in **Rust** for memory safety and performance, structured as a multi-crate workspace with 19 purpose-built subsystem crates. Its architecture enforces a strict principle throughout: **safety over liveness** — the network will stall rather than diverge.
+
+```
+Traditional Blockchain:     BLEEP:
+─────────────────────────   ────────────────────────────────────
+Static consensus rules   →  Adaptive multi-mode consensus
+Manual hard forks        →  Self-amending governance
+Vulnerable to quantum    →  Kyber1024 + SPHINCS+ post-quantum
+Isolated ecosystem       →  BLEEP Connect cross-chain engine
+Fixed governance         →  AI-advisory + ZK-private voting
+Single-threaded state    →  Dynamic sharding (AI load-balanced)
+```
+
+> **Current Status:** BLEEP V1 is in active development. Core layers (consensus, cryptography, governance, sharding, VM) are substantively implemented. Cross-chain integration and AI inference are in progress. See the [Roadmap](#roadmap) for details.
+
+---
+
+## Key Features
+
+| Feature | Description |
+|---|---|
+| **Adaptive Consensus** | Dynamically switches between Proof of Stake, PBFT, and Proof of Work based on real-time network conditions |
+| **Self-Healing** | Autonomous incident detection, classification, and recovery pipeline — no manual intervention required |
+| **Post-Quantum Security** | Kyber1024 KEM + SPHINCS+ signatures + AES-256-GCM hybrid encryption, resistant to quantum attack |
+| **AI-Advisory Intelligence** | ONNX-based deterministic ML inference with governance-approval gating; AI recommends, governance decides |
+| **Dynamic Sharding** | AI-predicted load balancing across shards with cross-shard 2PC atomicity and self-healing fault recovery |
+| **BLEEP VM** | WASM-based smart contract execution via Wasmer with strict gas metering, replay protection, and ZK proof hints |
+| **ZK-Private Governance** | Groth16/BLS12-381 zero-knowledge ballots, double-vote prevention, forkless protocol upgrades |
+| **BLEEP Connect** | Cross-chain interoperability engine with adapters for Ethereum, Solana, Polkadot, Cosmos, Bitcoin, and more |
+| **Constitutional Tokenomics** | 200M BLP hard cap, hash-committed supply state, dynamic fee market, validator slashing |
+| **Energy Efficient** | Hybrid PoS-dominant consensus eliminates wasteful proof-of-work under normal conditions |
 
 ---
 
 ## Architecture
 
-### Core Components
+BLEEP is organised into five conceptual layers:
 
-- **BLEEP VM**: Manages WASM smart contract execution, gas metering, and resource isolation.
-- **AI Engine**: Located in `core/ai_decision`, this module supports machine learning-driven decision logic.
-- **PAT Module**: Supports programmable assets using the BLP token.
-- **BLEEP Connect**: Enables cross-chain interaction and distribution.
-- **Configuration Files**: Define genesis parameters and network types (testnet/mainnet).
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│                        APPLICATION LAYER                             │
+│           dApps · BLEEPat Tokens · Wallets · CLI · RPC              │
+├──────────────────────────────────────────────────────────────────────┤
+│                         SERVICES LAYER                               │
+│       Governance · Compliance · Identity · Telemetry · Indexer       │
+├──────────────────────────────────────────────────────────────────────┤
+│                         CONTRACT LAYER                               │
+│          BLEEP VM (WASM/Wasmer) · Gas Metering · ZK Proofs           │
+├──────────────────────────────────────────────────────────────────────┤
+│                         NETWORK LAYER                                │
+│    Dynamic Sharding · BLEEP Connect · P2P (libp2p) · Dark Routing    │
+├──────────────────────────────────────────────────────────────────────┤
+│                           CORE LAYER                                 │
+│  Consensus (PoS/PBFT/PoW) · Self-Healing · PQ Crypto · Tokenomics   │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+**AI flows through every layer as an advisory system.** The `bleep-ai` crate generates signed, deterministic assessments (anomaly scores, governance recommendations, load predictions) that feed into governance decisions. AI cannot unilaterally execute protocol changes — this is a deliberate safety invariant.
+
+---
+
+## Workspace Crates
+
+```
+crates/
+├── bleep-core          # Block, transaction, mempool, rollback engine
+├── bleep-consensus     # PoS / PBFT / PoW engines, self-healing orchestrator
+├── bleep-crypto        # Post-quantum crypto, Merkle trees, ZKP verification
+├── bleep-governance    # Proposals, ZK voting, forkless upgrades, constitution
+├── bleep-economics     # Tokenomics, fee market, validator incentives, oracle bridge
+├── bleep-state         # Dynamic sharding, shard lifecycle, cross-shard 2PC
+├── bleep-vm            # WASM execution engine, gas metering, smart contracts
+├── bleep-ai            # AI decision module, deterministic ONNX inference
+├── bleep-interop       # BLEEP Connect, cross-chain adapters, liquidity pools
+├── bleep-p2p           # libp2p networking, gossip, peer management, dark routing
+├── bleep-pat           # Programmable Asset Tokens (BLEEPat)
+├── bleep-zkp           # Zero-knowledge proof library (Groth16 / ark-works)
+├── bleep-rpc           # HTTP/WebSocket RPC API (Warp)
+├── bleep-wallet-core   # Key management and signing
+├── bleep-auth          # Authentication (in progress)
+├── bleep-scheduler     # Async task scheduling
+├── bleep-telemetry     # Metrics, tracing, observability
+├── bleep-indexer       # Block and transaction indexer
+└── bleep-cli           # Command-line interface (clap)
+```
 
 ---
 
@@ -52,57 +146,427 @@ BLEEP is designed as a modular, scalable, and intelligent blockchain platform. I
 
 ### Prerequisites
 
-- Rust (latest stable)
-- `wasm-pack`
-- Git
+Ensure the following are installed before building BLEEP:
 
-### Building the Node
+| Dependency | Minimum Version | Notes |
+|---|---|---|
+| [Rust](https://rustup.rs) | 1.75+ | Install via `rustup` |
+| [Clang](https://releases.llvm.org) | 14+ | Required for `clang-sys` bindings |
+| [RocksDB](https://rocksdb.org) | 8.x | System library for persistent storage |
+| [CMake](https://cmake.org) | 3.20+ | Required for some native crate builds |
+| [libssl-dev](https://www.openssl.org) | 1.1+ | TLS support |
+
+**macOS:**
+```bash
+brew install cmake llvm rocksdb openssl
+export LIBRARY_PATH="$(brew --prefix)/lib:$LIBRARY_PATH"
+```
+
+**Ubuntu / Debian:**
+```bash
+sudo apt-get update
+sudo apt-get install -y \
+  build-essential cmake clang libclang-dev \
+  librocksdb-dev libssl-dev pkg-config
+```
+
+**Arch Linux:**
+```bash
+sudo pacman -S base-devel cmake clang rocksdb openssl
+```
+
+### Building from Source
 
 ```bash
-git clone https://github.com/BleepEcosystem/BLEEP-V1.git
-cd BLEEP-V1
+# Clone the repository
+git clone https://github.com/bleep-project/bleep.git
+cd bleep
+
+# Build all crates (release profile)
 cargo build --release
+
+# Build with post-quantum cryptography enabled (recommended)
+cargo build --release --features quantum
+
+# Build for testnet
+cargo build --release --features testnet
 ```
 
-### Running a Local Node
+The compiled binaries will be available at:
+```
+target/release/bleep          # Main node binary
+target/release/bleep_admin    # Admin CLI binary
+```
+
+### Running a Node
+
+**Testnet (recommended for development):**
+```bash
+./target/release/bleep \
+  --config config/testnet_config.json \
+  --data-dir ~/.bleep/testnet \
+  --log-level info
+```
+
+**Mainnet:**
+```bash
+./target/release/bleep \
+  --config config/mainnet_config.json \
+  --data-dir ~/.bleep/mainnet \
+  --log-level warn
+```
+
+**Docker:**
+```bash
+docker pull bleepecosystem/bleep:latest
+
+docker run -d \
+  --name bleep-node \
+  -v ~/.bleep:/data \
+  -p 30333:30333 \
+  -p 9933:9933 \
+  bleepecosystem/bleep:latest \
+  --config /data/config.json
+```
+
+### Configuration
+
+BLEEP uses JSON configuration files. Key parameters:
+
+```json
+// config/mainnet_config.json (excerpt)
+{
+  "network": {
+    "chain_id": 1,
+    "listen_address": "0.0.0.0:30333",
+    "bootstrap_peers": ["peer1.bleepecosystem.com:30333"]
+  },
+  "consensus": {
+    "mode": "adaptive",
+    "epoch_duration_ms": 6000,
+    "validator_threshold": 0.67
+  },
+  "sharding": {
+    "initial_shards": 16,
+    "max_shards": 1024,
+    "ai_rebalance_enabled": true
+  },
+  "quantum": {
+    "enabled": true,
+    "kem_algorithm": "kyber1024",
+    "signature_algorithm": "sphincs-sha2-256s"
+  }
+}
+```
+
+A full configuration reference is available in [`docs/configuration.md`](docs/configuration.md).
+
+---
+
+## Core Modules
+
+### Consensus Engine
+
+BLEEP's adaptive consensus dynamically transitions between three modes:
+
+```
+Network healthy + high participation  →  Proof of Stake (PoS)
+High-value tx / governance finality   →  PBFT
+Network instability / attack detected →  Proof of Work (fallback)
+```
+
+All mode transitions are gated through the AI advisory module and confirmed by the validator set. The `ConsensusEngine` trait enforces determinism: identical state always produces identical results.
+
+```rust
+// crates/bleep-consensus/src/engine.rs
+pub trait ConsensusEngine: Send + Sync {
+    fn verify_block(&self, block: &Block, state: &BlockchainState)
+        -> Result<(), ConsensusError>;
+    fn propose_block(&self, state: &BlockchainState, epoch: &EpochState)
+        -> Result<Block, ConsensusError>;
+    fn finalize_epoch(&self, epoch: &EpochState)
+        -> Result<(), ConsensusError>;
+}
+```
+
+### Self-Healing Orchestrator
+
+The self-healing pipeline runs continuously across all nodes:
+
+```
+1. IncidentDetector     →  Identifies anomalies (validator failures, forks, attacks)
+2. Classification       →  Healthy / Degraded / Anomalous / Critical
+3. RecoveryController   →  Executes deterministic recovery action
+4. HealingCycle log     →  Immutable, auditable record of every action taken
+```
+
+All validators execute the same recovery deterministically, ensuring the healed state is consistent across the network. Safety is always preferred over liveness: the network stalls rather than produces a divergent state.
+
+### Post-Quantum Cryptography
+
+BLEEP implements NIST-standardised post-quantum algorithms via the `bleep-crypto` crate:
+
+| Algorithm | Use Case | Key Sizes |
+|---|---|---|
+| **Kyber1024** | Key Encapsulation (KEM) | PK: 1568 B · SK: 3168 B · CT: 1568 B |
+| **SPHINCS+-SHA2-256s** | Digital Signatures | PK: 64 B · SK: 128 B · Sig: 29,792 B |
+| **AES-256-GCM** | Symmetric encryption (hybrid with Kyber) | Key: 32 B · Nonce: 12 B |
+
+Key derivation uses HKDF. All cryptographic operations are deterministic, serialisation-safe, and replay-protected via nonce tracking.
+
+```rust
+// Kyber1024 key encapsulation example
+use bleep_crypto::pq_crypto::{KyberKem, KyberPublicKey};
+
+let (pk, sk) = KyberKem::keygen()?;
+let (ciphertext, shared_secret) = KyberKem::encapsulate(&pk)?;
+let recovered_secret = KyberKem::decapsulate(&sk, &ciphertext)?;
+assert_eq!(shared_secret, recovered_secret);
+```
+
+### Dynamic Sharding
+
+BLEEP distributes transaction processing across dynamically-managed shards:
+
+- **AI Load Prediction** — `linfa`-based ML models forecast congestion and trigger rebalancing before bottlenecks occur
+- **Cross-Shard Atomicity** — Two-phase commit (2PC) with ZK-SNARK inter-shard proofs ensures atomic cross-shard transactions
+- **Shard Self-Healing** — Faulty shards are automatically isolated, transactions rerouted to healthy shards, and state rolled back and reconstructed
+- **Quantum-Secure Sync** — Cross-shard state synchronisation is protected by Kyber1024 encryption and Merkle-verified
+
+```rust
+// Initialise a sharding module
+let sharding = BLEEPShardingModule::new(
+    16,            // initial shard count
+    consensus,     // consensus reference
+    p2p_node,      // P2P network handle
+)?;
+```
+
+### BLEEP VM
+
+A deterministic WebAssembly execution environment powered by [Wasmer](https://wasmer.io):
+
+- **Strict gas metering** with per-opcode cost tables and overflow protection
+- **Memory sandboxing** with configurable page limits
+- **Replay protection** via per-transaction nonce tracking
+- **ZK proof hints** for privacy-preserving contract execution
+- **Signed transactions** with Ed25519 verification before execution
+
+```rust
+// Deploy and execute a WASM smart contract
+let vm = BleepVM::new(gas_limit);
+let tx = SignedTransaction {
+    nonce: 1,
+    gas_limit: 1_000_000,
+    payload: wasm_bytecode,
+    signature: sig,
+    signer: pubkey,
+};
+let result = vm.execute_transaction(tx, &mut state)?;
+println!("Gas used: {}, State root: {}", result.gas_used, hex::encode(result.state_root));
+```
+
+### Governance
+
+BLEEP governance requires no hard forks. All protocol changes flow through an on-chain lifecycle:
+
+```
+Submit Proposal  →  AI Classification  →  ZK Voting Period
+      →  Threshold Met?  →  Forkless Auto-Execution  →  Merkle-logged
+```
+
+**ZK-Private Voting** — Voters submit zero-knowledge ballots (Groth16 commitments) that are verifiable but reveal nothing about individual votes. Double-voting is cryptographically impossible via nonce-bound commitments.
+
+**Constitutional Layer** — A set of hard-coded invariants (maximum supply, Byzantine thresholds, protocol safety rules) that governance proposals cannot override.
+
+**Forkless Upgrades** — The `ProtocolUpgradeManager` applies state migrations atomically at a pre-agreed block height without splitting the network.
+
+### BLEEP Connect
+
+The cross-chain interoperability engine connects BLEEP to external blockchain networks:
+
+```
+User Request → AI Fraud Analysis → ZKP Generation → Quantum Encryption
+     → Chain Adapter → RPC Execution → Merkle Confirmation
+```
+
+**Supported Networks (in development):**
+Ethereum · Bitcoin · Binance Smart Chain · Solana · Polkadot · Cosmos · Avalanche · Optimism · Arbitrum · TON
+
+### Tokenomics (BLP)
+
+| Parameter | Value |
+|---|---|
+| **Maximum Supply** | 200,000,000 BLP (hard-coded, constitution-enforced) |
+| **Genesis Supply** | 0 (all tokens emitted via network participation) |
+| **Emission Types** | Block proposal · Participation · Healing · Cross-shard coordination |
+| **Burn Types** | Transaction fees · Slashing penalties · Governance rejection |
+| **Fee Distribution** | Validators 60% · Treasury 30% · Burn 10% |
+| **Staking Yield** | 4–8% APY (lock-up dependent) |
+
+Supply state is hash-committed at every epoch, enabling cryptographic proof of the circulating supply at any historical point.
+
+---
+
+## Testing
+
+BLEEP maintains a comprehensive test suite across all crates:
 
 ```bash
-cargo run -- --config config/testnet_config.json
+# Run all tests
+cargo test --workspace
+
+# Run tests for a specific crate
+cargo test -p bleep-consensus
+
+# Run with output (useful for debugging)
+cargo test --workspace -- --nocapture
+
+# Run integration tests only
+cargo test --workspace --test '*'
+
+# Run property-based tests (proptest / quickcheck)
+cargo test --workspace --features proptest
 ```
 
-> For mainnet, switch to `config/mainnet_config.json`.
+The test suite includes:
+- **Unit tests** — per-module function correctness
+- **Integration tests** — cross-crate interaction (phase1 through phase6 test files)
+- **Safety invariant tests** — Byzantine fault tolerance and consensus invariants
+- **Adversarial tests** — `bleep-core/src/adversarial_testnet.rs` simulates attack scenarios
+- **Property-based tests** — randomised input validation via `proptest` and `quickcheck`
 
 ---
 
-## Configuration
+## Benchmarks
 
-- `config/genesis.json`: Initial blockchain state
-- `config/testnet_config.json`: Test network settings
-- `config/mainnet_config.json`: Production environment
+Performance benchmarks use [Criterion](https://github.com/bheisler/criterion.rs):
 
-Update these as needed for custom deployments or forks.
+```bash
+# Run all benchmarks
+cargo bench --workspace
+
+# Run a specific benchmark suite
+cargo bench -p bleep-consensus
+
+# Generate HTML benchmark report
+cargo bench --workspace -- --output-format bencher | tee bench_results.txt
+```
+
+> **Note:** Throughput benchmarks validating the target transaction processing capacity are actively being developed. Results will be published in [`docs/benchmarks.md`](docs/benchmarks.md) prior to testnet launch.
 
 ---
 
-## BLEEP Token (BLP)
+## Roadmap
 
-- **Symbol**: `BLP`
-- **Decimals**: 18
-- **Total Supply**: 200,000,000
-- **Governance**: Hybrid structure (on-chain + council)
-- **Tokenomics**: Supports programmable asset fuel, staking, governance, and faucet use.
+| Phase | Target | Deliverables | Status |
+|---|---|---|---|
+| **Phase 1** | Q4 2025 | Core protocol, consensus engines, testnet deployment | ✅ Complete |
+| **Phase 2** | Q1 2026 | BLEEP VM, smart contracts, developer tooling, BLEEPat | 🔄 In Progress |
+| **Phase 3** | Q4 2026 | BLEEP Connect cross-chain, live RPC adapters, liquidity pools | 🔄 In Progress |
+| **Phase 4** | Q2 2027 | Production AI inference, full ONNX model deployment | 📋 Planned |
+| **Phase 5** | Q4 2027 | Enterprise solutions, compliance automation, industry integrations | 📋 Planned |
+
+Follow progress in [GitHub Issues](https://github.com/bleep-project/bleep/issues) and [GitHub Projects](https://github.com/bleep-project/bleep/projects).
 
 ---
 
-## Programmable Asset Token (PAT)
+## Security
 
-PATs are smart asset representations in the BLEEP ecosystem. They are:
+### Reporting Vulnerabilities
 
-- Modular
-- Governed using BLP
-- Interoperable across chains and apps
-- Designed for both on-chain and off-chain asset representation
+BLEEP takes security seriously. **Do not open a public GitHub issue for security vulnerabilities.**
 
+Please report security issues via:
+- **Email:** security@bleepecosystem.com
+- **PGP Key:** Available at [bleepecosystem.com/security](https://www.bleepecosystem.com/security)
+
+We follow a 90-day responsible disclosure policy and acknowledge all valid reports within 48 hours.
+
+### Security Architecture Principles
+
+1. **Quantum resistance by default** — All cryptographic operations use post-quantum algorithms. Classical signatures (Ed25519, secp256k1) are supported for compatibility but not recommended for long-term asset security.
+2. **AI is advisory only** — The AI decision module produces signed recommendations. It cannot execute any protocol changes without governance approval. This is enforced at the type system level.
+3. **Safety over liveness** — The network halts rather than produces a conflicting state. Byzantine fault tolerance thresholds are explicitly enforced in code, not just documentation.
+4. **Deterministic execution** — All consensus-critical computations (including AI inference) produce bit-identical results on every node. Non-determinism is a consensus bug.
+5. **Explicit error propagation** — No panics in consensus-critical paths. All errors are typed, logged, and handled.
+
+### Known Limitations (V1)
+
+- Cross-chain RPC integrations (BLEEP Connect) are under active development. Live asset transfers are not yet available on mainnet.
+- ONNX model files for AI inference will be bundled in Phase 4; current AI functionality operates in advisory/structural mode.
+- Dark routing onion encryption is being implemented; the current P2P layer uses libp2p Noise protocol for transport security.
+
+---
+
+## Contributing
+
+Contributions are welcome. Please read [`CONTRIBUTING.md`](CONTRIBUTING.md) and [`CODE-OF-CONDUCT.md`](CODE-OF-CONDUCT.md) before opening a pull request.
+
+### Development Setup
+
+```bash
+# Install development tools
+cargo install cargo-audit cargo-deny cargo-watch cargo-expand
+
+# Check formatting
+cargo fmt --all -- --check
+
+# Run linter
+cargo clippy --workspace --all-targets -- -D warnings
+
+# Run security audit
+cargo audit
+
+# Watch for changes during development
+cargo watch -x "test --workspace"
+```
+
+### Pull Request Guidelines
+
+- Every PR must pass CI (build, lint, test, security audit)
+- New consensus-critical code must include safety invariant tests
+- Cryptographic changes require a security review comment from a maintainer
+- Breaking changes must update relevant documentation and bump the crate version
+
+---
+
+## Documentation
+
+| Resource | Link |
+|---|---|
+| Whitepaper | [`docs/BLEEP_Whitepaper.pdf`](docs/BLEEP_Whitepaper.pdf) |
+| Architecture Deep Dive | [`docs/architecture.md`](docs/architecture.md) |
+| Configuration Reference | [`docs/configuration.md`](docs/configuration.md) |
+| API Reference (RPC) | [`docs/rpc-api.md`](docs/rpc-api.md) |
+| Smart Contract Guide | [`docs/smart-contracts.md`](docs/smart-contracts.md) |
+| Validator Setup | [`docs/validator-setup.md`](docs/validator-setup.md) |
+| Tokenomics Specification | [`docs/tokenomics.md`](docs/tokenomics.md) |
+| Benchmarks | [`docs/benchmarks.md`](docs/benchmarks.md) |
+
+Generated API documentation:
+```bash
+cargo doc --workspace --no-deps --open
+```
+
+---
+
+## License
+
+BLEEP is dual-licensed under **MIT** and **Apache 2.0**. You may choose either licence.
+
+- [MIT License](LICENSE-MIT)
+- [Apache 2.0 License](LICENSE-APACHE)
+
+---
+
+<div align="center">
+
+Built with ❤️ in Rust by the BLEEP Ecosystem team.
+
+[bleepecosystem.com](https://www.bleepecosystem.com) · [@BLEEPEcosystem](https://twitter.com/BLEEPEcosystem)
+
+</div>
 ---
 
 ## Faucet & Wallet
