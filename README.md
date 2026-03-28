@@ -19,6 +19,7 @@
 
 </div>
 
+
 ---
 
 ## Table of Contents
@@ -469,7 +470,11 @@ cargo bench --workspace -- --output-format bencher | tee bench_results.txt
 
 Follow progress in [GitHub Issues](https://github.com/bleep-project/bleep/issues) and [GitHub Projects](https://github.com/bleep-project/bleep/projects).
 
----
+[node]
+p2p_port    = 7700
+rpc_port    = 8545
+state_dir   = "/var/lib/bleep/state"
+log_level   = "info"
 
 ## Security
 
@@ -569,82 +574,230 @@ Built with ❤️ in Rust by the BLEEP Ecosystem team.
 </div>
 ---
 
-## Faucet & Wallet
+## CLI Reference
 
-BLEEP includes a combined wallet + faucet system with:
+```
+bleep-cli [OPTIONS] <COMMAND>
 
-- Wallet creation and import
-- AI-based management features
-- Multi-chain integration
-- Cross-chain distribution via **BLEEP Connect**
-- WASM contract support
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+
+Environment variables:
+  BLEEP_RPC        RPC endpoint     default: http://127.0.0.1:8545
+  BLEEP_STATE_DIR  Local DB path    default: /tmp/bleep-state
+  RUST_LOG         Log filter       default: info
+
+Commands:
+  start-node                        Start a full BLEEP node
+  wallet create                     Generate SPHINCS+ keypair + encrypted wallet
+  wallet balance                    Query balance from /rpc/state
+  wallet import <phrase>            Import from BIP-39 mnemonic
+  wallet export                     Export wallet addresses
+  tx send --to <addr> --amount <n>  Sign and broadcast a transfer
+  tx history                        Retrieve transaction history
+  validator stake --amount <n>      Register as validator
+  validator unstake                 Initiate graceful exit
+  validator list                    List active validators
+  validator status <id>             Validator status + slashing history
+  validator submit-evidence <file>  Submit double-sign evidence
+  governance propose <text>         Create a governance proposal
+  governance vote <id> --yes/--no   Cast a vote
+  governance list                   List all proposals
+  state snapshot                    Create a RocksDB state snapshot
+  state restore <path>              Restore from snapshot
+  block latest                      Print the latest block
+  block get <id>                    Get a block by hash or height
+  block validate <hash>             Validate a block by hash
+  zkp <proof>                       Verify a ZKP
+  ai ask <prompt>                   Ask the AI advisory engine
+  ai status                         AI engine status
+  pat status                        PAT engine status
+  pat list                          List asset tokens
+  pat mint --to <addr> --amount <n> Mint PAT tokens (owner only)        
+  pat burn --amount <n>             Burn PAT tokens                      
+  pat transfer --to <addr> --amount Transfer PAT with auto burn-rate     
+  pat balance <address>             Query PAT balance                    
+  oracle price <asset>              Query aggregated oracle price        
+  oracle submit --asset ... --price Submit oracle price update           
+  economics supply                  Circulating supply, minted, burned   
+  economics fee                     Current EIP-1559 base fee            
+  economics epoch <n>               Epoch emissions, burns, price        
+  telemetry                         Print telemetry metrics
+  info                              Node version and RPC health
+```
+
+### Executor node
+
+The `bleep-executor` binary is a separate process that participates in the Layer 4 instant intent market:
+
+```bash
+# Basic usage (ephemeral key, 0.1 BLEEP capital)
+./bleep-executor
+
+# Production usage
+BLEEP_EXECUTOR_KEY=<32-byte-hex-seed>      \
+BLEEP_EXECUTOR_CAPITAL_BLEEP=100000000000  \
+BLEEP_EXECUTOR_CAPITAL_ETH=10000000000000000000 \
+BLEEP_EXECUTOR_RISK=Medium                 \
+BLEEP_RPC=http://your-node:8545            \
+./bleep-executor
+```
+
+
+
+## Security Model
+
+### Post-quantum threat model
+
+BLEEP treats a cryptographically relevant quantum computer as a near-term engineering assumption, not a distant theoretical risk. Accordingly:
+
+- **SPHINCS+-SHAKE-256** (NIST PQC, stateless hash-based) signs all transactions and blocks.
+- **Kyber-768** (ML-KEM, NIST FIPS 203) is used for all key encapsulation.
+- **AES-256-GCM** is used for symmetric encryption (128-bit post-quantum security at 256-bit key size).
+- **SHA3-256 and BLAKE3** provide collision-resistant hashing.
+- **Ed25519** is retained in P2P message authentication at the 128-bit classical security level and is scheduled for replacement with SPHINCS+.
+
+### Consensus safety
+
+- **Byzantine fault tolerance:** The system tolerates up to ⅓ of total stake being Byzantine (malicious or offline).
+- **Deterministic mode selection:** No single validator can trigger a mode switch. Selection is a pure function of epoch metrics.
+- **Automatic slashing:** Double-sign evidence triggers an on-chain 33% stake penalty without human intervention.
+- **Irreversible finality:** Once `accumulated_voting_power > (2/3) * total_stake`, a `FinalizyCertificate` is produced. That block and its state root cannot be rolled back.
+
+### State integrity
+
+- **SparseMerkleTrie** ensures any modification to any account balance or nonce produces a different state root, which propagates through the block hash to the `validator_signature` and `zk_proof`. Tampered state is detectable by any node holding the state root.
+- **Fiat-Shamir ZKP** binds the state root, shard state root, consensus mode, and tx count into `zk_proof`. A validator cannot produce a valid ZKP over a different set of transactions or state root.
+- **Inflation invariant:** `CanonicalTokenomicsEngine` checks `total_minted ≤ MAX_SUPPLY` independently of `circulating_supply`. Concurrent burns cannot mask over-issuance.
+
+### P2P security
+
+- All sessions are established with Kyber-768 KEM; payload encryption is AES-256-GCM.
+- An anti-replay nonce cache rejects duplicate messages within a session window.
+- AI-scored peer reputation and stake-weighted selection provide Sybil resistance.
+- Onion routing with 3 hops and per-hop Kyber-768 KEM prevents traffic analysis.
 
 ---
 
 ## Development Roadmap
 
-- [x] Node deployment and configuration
-- [x] BLP token model finalized
-- [x] AI module architecture defined
-- [ ] PAT module implementation
-- [ ] Faucet + Wallet integration
-- [ ] Cross-chain support with BLEEP Connect
-- [ ] AI/Quantum/ZK upgrades to BLEEP VM
-- [ ] Super App ecosystem front-end
+BLEEP follows a structured, phase-based development roadmap. Phases 1–3 are complete. The four upcoming phases — AI model training, public testnet expansion, pre-sale ICO, and mainnet launch — form the path to production.
 
 ---
 
-## 🔧 Testnet Status
+### Phase 1 — Foundation ✅ *Complete*
 
-BLEEP is currently in internal testnet mode with multiple validator nodes under simulation.  
-A public testnet (with explorer, faucet, and developer tools) will launch in **Q4 2025**.
+All 19 crates compile cleanly. Post-quantum cryptography active (SPHINCS+-SHAKE-256, Kyber-1024). RocksDB `StateManager` with `SparseMerkleTrie`. Full `BlockProducer` loop. Real Groth16 ZK circuits. 4-node docker-compose devnet. BLEEP Connect Layer 4 live on Ethereum Sepolia. `BleepEconomicsRuntime` (EIP-1559 fee market, oracle bridge, validator incentives). `PATRegistry` live. `bleep-executor` standalone intent market maker.
 
 ---
 
-## 💖 Support BLEEP
+### Phase 2 — Testnet Alpha ✅ *Complete*
 
-BLEEP is self-funded and fully open-source. Your support accelerates core development, ecosystem growth, and infrastructure audits.
+7-validator `bleep-testnet-1` genesis across 4 continents. Public DNS seeds at `seeds.testnet.bleep.network`. Public faucet (`POST /faucet/{address}`, 1,000 BLEEP per 24 hours). Block explorer (`GET /explorer`, 6 s refresh). JWT rotation, NDJSON audit export. Grafana dashboard (12 panels) + Prometheus for all 7 validators. Full CI pipeline: fmt, clippy, test, audit, build, fuzz-smoke, docker-smoke.
 
-### Donate Crypto
+---
 
-| Asset | Address | Link |
-|-------|---------|------|
-| **ETH / USDT (ERC-20)** | `0x4c3ceb507f7b2f976b31caed45ceeefab5ee5bd2` | [View on Etherscan](https://etherscan.io/address/0x4c3ceb507f7b2f976b31caed45ceeefab5ee5bd2) |
-| **BTC** | `16mMB2di5BMCjGTEzf49mPvF5QSkxz2NVX` | [View on Blockchain.com](https://www.blockchain.com/btc/address/16mMB2di5BMCjGTEzf49mPvF5QSkxz2NVX) |
-| **TRC-20 USDT** | `TDmE78aQnLHdaVNRnXFKykXpLfb6j4UgDj` | [View on Tronscan](https://tronscan.org/#/address/TDmE78aQnLHdaVNRnXFKykXpLfb6j4UgDj) |
+### Phase 3 — Protocol Hardening ✅ *Complete*
+
+- ✅ **Independent security audit** — 14 findings (2 Critical, 3 High, 4 Medium, 3 Low, 2 Info); all Critical/High resolved — see `docs/SECURITY_AUDIT.md`
+- ✅ **Chaos testing** — 14 scenarios, 72-hour continuous harness — see `docs/CHAOS_TESTING.md`
+- ✅ **ZKP MPC ceremony** — 5-participant Powers-of-Tau on BLS12-381; transcript at `https://ceremony.bleep.network/transcript-v1.json`
+- ✅ **Cross-shard stress test** — 10 shards, 1,000 concurrent cross-shard txs, 100 epochs
+- ✅ **BLEEP Connect Layer 3** — Groth16 batch proof bridge live on testnet
+- ✅ **Live governance** — `LiveGovernanceEngine` with typed proposals, weighted voting, veto, on-chain execution
+- ✅ **Performance benchmark** — avg **10,921 TPS**, peak **13,200 TPS** across 10 shards for 1 hour
+- ✅ **Token distribution model** — 6 allocation buckets, vesting schedules, 25/50/25 fee split, compile-time verified constants
+
+**Definition of done:** Security audit fully resolved ✅ · Chaos suite 72 h ✅ · ≥10,000 TPS ✅
+
+---
+
+### Phase 4 — AI Model Training ⏳ *Active*
+
+Upgrade `bleep-ai` from rule-based advisory to a trained on-chain inference engine.
+
+- `BLEEPAIAssistant v2` — training pipeline using on-chain governance history as training data
+- AI validator nodes — optional validator upgrade for AI-scored transaction prioritisation
+- `AIConstraintValidator v2` — trained classification models for governance pre-flight scoring
+- Determinism guarantee — all AI inference on consensus-critical paths uses fixed-seed reproducible models
+
+**Definition of done:** AI advisory engine passes determinism test suite; governance pre-flight achieves ≥95% accuracy on labelled test set.
+
+---
+
+### Phase 5 — Public Testnet Expansion ⏳ *Upcoming*
+
+Open validator onboarding to the public. Target: ≥50 validators across ≥6 continents.
+
+- Open validator registration with public `VALIDATOR_GUIDE.md`
+- Validator incentive programme from Ecosystem Fund
+- `testnet.bleep.network` — multi-validator explorer, leaderboard, public dashboard
+- 30-day sustained test with live validator join/leave events
+- Cross-shard expansion: 10 → 20 shards as validator count permits
+- Community bug bounty: up to 100,000 BLEEP for documented protocol vulnerabilities
+
+**Definition of done:** 50+ active validators; 30 consecutive days without manual intervention.
+
+---
+
+### Phase 6 — Pre-Sale / ICO ⏳ *Upcoming*
+
+Community token sale in two tranches. Deploy on-chain vesting contracts.
+
+| Tranche | Source | Lockup |
+|---|---|---|
+| Strategic Pre-Sale | Strategic Reserve (5M BLEEP) | 12-month cliff + 24-month linear |
+| Public ICO | Community Incentives (up to 10M BLEEP) | 6-month linear vest |
+
+KYC/AML compliant infrastructure · Multi-sig treasury custody · `LinearVestingSchedule` contracts deployed · `GenesisAllocation` engine activated for all 6 buckets.
+
+**Definition of done:** ICO completed; all vesting contracts deployed and verified on-chain.
+
+---
+
+### Phase 7 — Mainnet Launch 🔜 *Planned*
+
+Production mainnet with post-quantum security, live economics, and cross-chain connectivity from the genesis block.
+
+- Mainnet genesis ceremony — public, multi-party verifiable
+- ≥21 validators with geographic diversity enforced by genesis rules
+- BLEEP Connect L4 + L3 live on Ethereum mainnet and Solana from genesis
+- Governance active from block 1
+- Full tokenomics live — emission, burn, staking rewards, oracle, EIP-1559 fee market
+- Block explorer at `explorer.bleep.network`
+- `bleep-sdk-js` and `bleep-sdk-python` SDK releases
+- NTP drift guard at node startup (warn >1 s, halt >30 s)
+
+**Definition of done:** Genesis block produced by ≥21 independent validators; governance proposal passes on-chain within first week; cross-chain Ethereum transfer confirms within 1 second.
 
 ---
 
 ## Contributing
 
-We welcome developers, researchers, and testers.
+1. Fork the repository and create a feature branch: `git checkout -b feat/your-feature`
+2. Run the full test suite: `cargo test --workspace`
+3. Run the linter: `cargo clippy --workspace -- -D warnings`
+4. Verify formatting: `cargo fmt --all -- --check`
+5. Open a pull request against `main` with a clear description of the change and the crates affected.
 
-1. Fork the repository
-2. Create your branch: `git checkout -b feature/my-feature`
-3. Commit changes: `git commit -am 'Add feature'`
-4. Push and create a PR
+Changes to `bleep-consensus`, `bleep-crypto`, or `bleep-state` undergo an extended review given their security surface area.
 
-Please follow our [Code of Conduct](./.github/CODE_OF_CONDUCT.md).
+### Security disclosures
 
----
-
-## 🌐 Community
-
-- **Website**: [https://bleepecosystem.com](https://bleepecosystem.com)
-- **GitHub**: [https://github.com/BleepEcosystem](https://github.com/BleepEcosystem)
-- **X (Twitter)**: [@bleepecosystem](https://x.com/bleepecosystem)
-- **Telegram**: [Join Chat](https://t.me/bleepecosystem)
-- **Discord**: https://discord.gg/KSrHuYFcpD
+Do not open public issues for security vulnerabilities. Email `security@bleep.network` with a description, reproduction steps, and your proposed fix. We target 72-hour acknowledgment and a 14-day patch timeline.
 
 ---
 
 ## License
 
-This repository is licensed under the Apache License 2.0. See the [LICENSE](./LICENSE) file for details.
+Licensed under either of:
 
-Some subcomponents are under different licenses:
+- [MIT License](LICENSE-MIT)
+- [Apache License, Version 2.0](LICENSE-APACHE)
 
-- Smart contracts (`/smart-contracts`) – GNU GPLv3  
-- SDKs (`/sdk`) – MIT License  
-- Virtual Machine (`/vm`) – Business Source License 1.1  
-- Documentation (`/docs`) – Creative Commons Attribution 4.0 (CC-BY-4.0)
+at your option.
+
+---
+
+*BLEEP Blockchain — built in Rust, secured with post-quantum cryptography, designed for the next decade of decentralised computing.*

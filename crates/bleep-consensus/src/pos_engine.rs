@@ -1,4 +1,4 @@
-// PHASE 1: PROOF-OF-STAKE CONSENSUS ENGINE
+// PROOF-OF-STAKE CONSENSUS ENGINE
 // Validator-based block selection and finalization
 // 
 // SAFETY INVARIANTS:
@@ -11,8 +11,7 @@ use crate::epoch::EpochState;
 use crate::engine::{ConsensusEngine, ConsensusError};
 use bleep_core::block::{Block, Transaction, ConsensusMode};
 use bleep_core::blockchain::BlockchainState;
-use std::collections::HashMap;
-use log::{info, warn};
+use log::info;
 
 /// Validator stake information.
 #[derive(Debug, Clone)]
@@ -63,6 +62,23 @@ impl PoSConsensusEngine {
         }
     }
 
+    /// Get this validator's stake weight.
+    pub fn my_stake(&self) -> u64 {
+        self.my_stake
+    }
+
+    /// Get the last block height this validator signed.
+    pub fn last_signed_block_height(&self) -> u64 {
+        self.last_signed_block_height
+    }
+
+    /// Update the last signed block height.
+    pub fn update_last_signed_block(&mut self, height: u64) {
+        if height > self.last_signed_block_height {
+            self.last_signed_block_height = height;
+        }
+    }
+
     /// Select the block proposer for a given height.
     /// 
     /// SAFETY: This function is deterministic.
@@ -70,7 +86,9 @@ impl PoSConsensusEngine {
     /// 
     /// Uses weighted random selection: each validator has probability
     /// proportional to their stake.
-    fn select_proposer(
+    /// 
+    /// PUBLIC: Called by orchestrator during block proposal selection.
+    pub fn select_proposer(
         height: u64,
         validators: &[ValidatorStake],
         prev_block_hash: &str,
@@ -102,30 +120,50 @@ impl PoSConsensusEngine {
         let selection = seed % total_stake;
 
         let mut accumulated = 0;
-        for validator in active {
+        let selected_validator = active.iter().find(|validator| {
             accumulated += validator.stake;
-            if accumulated > selection {
-                return Ok(validator.id.clone());
-            }
-        }
+            accumulated > selection
+        });
 
-        // Fallback (should not reach here if logic is correct)
-        Ok(active[0].id.clone())
+        // Return selected or first validator as fallback
+        if let Some(validator) = selected_validator {
+            Ok(validator.id.clone())
+        } else {
+            Ok(active[0].id.clone())
+        }
     }
 
-    /// Compute a deterministic seed from height and previous hash.
-    fn compute_seed(height: u64, prev_hash: &str) -> u64 {
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
-
-        let mut hasher = DefaultHasher::new();
-        height.hash(&mut hasher);
-        prev_hash.hash(&mut hasher);
-        hasher.finish()
+    /// Compute a deterministic proposer-selection seed.
+    ///
+    /// ## S-02 Fix: SHA-256 replaces DefaultHasher
+    ///
+    /// `DefaultHasher` (SipHash-1-3) uses a **per-process random seed** since
+    /// Rust 1.7.  Two independent nodes computing `DefaultHasher(height, prev_hash)`
+    /// produce *different* values, making them select *different* proposers —
+    /// a consensus-safety violation.  It is also not collision-resistant,
+    /// enabling stake-grinding attacks.
+    ///
+    /// **Fix:** `SHA-256(height_le8 || prev_hash_utf8)`, first 8 bytes → `u64`.
+    ///
+    /// Properties:
+    /// - **Platform-deterministic** — every honest node computes the same seed.
+    /// - **Pre-image resistant** — prevents seed prediction / grinding.
+    /// - **No extra dependency** — `sha2` is already in the workspace.
+    ///
+    /// PUBLIC: Called by select_proposer to generate deterministic selection.
+    pub fn compute_seed(height: u64, prev_hash: &str) -> u64 {
+        use sha2::{Digest, Sha256};
+        let mut h = Sha256::new();
+        h.update(&height.to_le_bytes());
+        h.update(prev_hash.as_bytes());
+        let d = h.finalize();
+        u64::from_le_bytes([d[0], d[1], d[2], d[3], d[4], d[5], d[6], d[7]])
     }
 
     /// Check if a validator is allowed to participate.
-    fn check_validator_health(validator: &ValidatorStake) -> Result<(), ConsensusError> {
+    /// 
+    /// PUBLIC: Called when validating block proposals.
+    pub fn check_validator_health(validator: &ValidatorStake) -> Result<(), ConsensusError> {
         if !validator.active {
             return Err(ConsensusError::ProposalRejected {
                 reason: format!("Validator {} is not active", validator.id),
@@ -204,13 +242,16 @@ impl ConsensusEngine for PoSConsensusEngine {
         _blockchain_state: &BlockchainState,
     ) -> Result<Block, ConsensusError> {
         // SAFETY: Create block with correct consensus fields
-        let mut block = Block::with_consensus(
+        let mut block = Block::with_consensus_and_sharding(
             height,
             transactions,
             previous_hash,
             epoch_state.epoch_id,
             ConsensusMode::PosNormal,
             1, // protocol_version
+            String::new(), // shard_registry_root
+            0, // shard_id - default to main shard
+            String::new(), // shard_state_root
         );
 
         // SAFETY: Sign the block with our validator key
@@ -346,16 +387,31 @@ mod tests {
 
     #[test]
     fn test_compute_seed_deterministic() {
+        // SHA-256 has no per-process salt — must be identical across calls.
         let seed1 = PoSConsensusEngine::compute_seed(100, "hash1");
         let seed2 = PoSConsensusEngine::compute_seed(100, "hash1");
-        assert_eq!(seed1, seed2);
+        assert_eq!(seed1, seed2, "S-02: seed must be identical for same inputs");
     }
 
     #[test]
     fn test_compute_seed_different_inputs() {
         let seed1 = PoSConsensusEngine::compute_seed(100, "hash1");
         let seed2 = PoSConsensusEngine::compute_seed(101, "hash1");
-        // Different heights should produce different seeds (with high probability)
-        assert_ne!(seed1, seed2);
+        assert_ne!(seed1, seed2, "S-02: different heights must yield different seeds");
+    }
+
+    #[test]
+    fn test_compute_seed_matches_sha256() {
+        use sha2::{Digest, Sha256};
+        let mut h = Sha256::new();
+        h.update(&55u64.to_le_bytes());
+        h.update(b"prev_abc");
+        let d = h.finalize();
+        let expected = u64::from_le_bytes([d[0],d[1],d[2],d[3],d[4],d[5],d[6],d[7]]);
+        assert_eq!(
+            PoSConsensusEngine::compute_seed(55, "prev_abc"),
+            expected,
+            "S-02: must match SHA-256(height_le8 || prev_hash)"
+        );
     }
 }

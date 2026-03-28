@@ -37,6 +37,7 @@ ark-serialize = "0.4.0"
 tokio = { version = "1.36", features = ["full"] }
 async-trait = "0.1.77"
 parking_lot = "0.12.1"
+tracing = "0.1"
 
 # Time & Logging
 chrono = { version = "0.4.34", features = ["serde"] }
@@ -44,6 +45,8 @@ linfa = "0.7.1"
 linfa-clustering = "0.7.1"
 pqcrypto = { version = "0.18.1", optional = true }
 pqcrypto-kyber = { version = "0.8.0", optional = true }
+pqcrypto-sphincsplus = "0.7.1"
+pqcrypto-traits = "0.3.5"
 linfa-nn = "0.7.2"
 ndarray = "0.15.6"
 bleep-crypto = { path = "../bleep-crypto" }

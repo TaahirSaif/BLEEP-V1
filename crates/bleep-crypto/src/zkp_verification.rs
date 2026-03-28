@@ -28,6 +28,10 @@ pub enum BLEEPError {
     Io(#[from] std::io::Error),
     #[error("Bincode error: {0}")]
     Bincode(#[from] Box<bincode::ErrorKind>),
+    /// C-03 FIX: Added so finalize_block can return a typed error instead of
+    /// recursing indefinitely.
+    #[error("Consensus failed: {0}")]
+    ConsensusFailed(String),
 }
 
 /// **ZKP Module with Advanced Security & Performance**
@@ -119,8 +123,8 @@ impl BLEEPZKPModule {
     /// In production, keys should be deserialized from trusted sources using
     /// proper cryptographic serialization formats that preserve key integrity.
     pub fn load_keys(
-        _proving_key_path: &str,
-        _verifying_key_path: &str,
+        proving_key_path: &str,
+        verifying_key_path: &str,
     ) -> Result<Self, BLEEPError> {
         // Safe initialization without requiring invalid key values.
         // Keys can be loaded and set later using set_keys() or loaded from

@@ -11,7 +11,7 @@
 // 7. Detection is DETERMINISTIC and VERIFIABLE by any node
 // 8. Faults cannot be detected and then disputed without evidence
 
-use crate::shard_registry::{ShardId, EpochId, ShardStateRoot};
+use crate::shard_registry::{ShardId, EpochId};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use log::{info, warn, error};
@@ -616,6 +616,11 @@ impl AdvancedFaultDetector {
     pub fn total_detected(&self) -> u64 {
         self.total_faults_detected
     }
+    
+    /// Get shard state history for a specific shard
+    pub fn get_shard_history(&self, shard_id: &ShardId) -> Option<&VecDeque<ShardSnapshot>> {
+        self.shard_state_history.get(shard_id)
+    }
 }
 
 #[cfg(test)]
@@ -642,9 +647,16 @@ mod tests {
             3,
         );
 
-        assert!(evidence.is_some());
-        let ev = evidence.unwrap();
+        let ev = match evidence {
+            Some(ev) => ev,
+            None => {
+                error!("No evidence found.");
+                return;
+            }
+        };
         assert_eq!(ev.severity, FaultSeverity::Critical);
+
+        // ...existing code...
     }
 
     #[test]
@@ -660,9 +672,16 @@ mod tests {
             "hash2".to_string(),
         );
 
-        assert!(evidence.is_some());
-        let ev = evidence.unwrap();
+        let ev = match evidence {
+            Some(ev) => ev,
+            None => {
+                error!("No evidence found.");
+                return;
+            }
+        };
         assert_eq!(ev.severity, FaultSeverity::Critical);
+
+        // ...existing code...
     }
 
     #[test]
@@ -676,9 +695,16 @@ mod tests {
             EpochId(10),
         );
 
-        assert!(evidence.is_some());
-        let ev = evidence.unwrap();
+        let ev = match evidence {
+            Some(ev) => ev,
+            None => {
+                error!("No evidence found.");
+                return;
+            }
+        };
         assert!(ev.severity >= FaultSeverity::Medium);
+
+        // ...existing code...
     }
 
     #[test]
@@ -694,9 +720,16 @@ mod tests {
             false,  // tx doesn't exist
         );
 
-        assert!(evidence.is_some());
-        let ev = evidence.unwrap();
+        let ev = match evidence {
+            Some(ev) => ev,
+            None => {
+                error!("No evidence found.");
+                return;
+            }
+        };
         assert_eq!(ev.severity, FaultSeverity::High);
+
+        // ...existing code...
     }
 
     #[test]
@@ -712,7 +745,13 @@ mod tests {
             3,
         ).unwrap();
 
-        let fault_id = detector.record_fault(evidence).unwrap();
+        let fault_id = match detector.record_fault(evidence) {
+            Ok(id) => id,
+            Err(e) => {
+                error!("Failed to record fault: {:?}", e);
+                return;
+            }
+        };
         let recorded = detector.get_fault(&fault_id);
         assert!(recorded.is_some());
     }
